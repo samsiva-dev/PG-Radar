@@ -11,86 +11,118 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const CACHE_TTL_MS = 10 * 60 * 1000  // 10 minutes
+const DEFAULT_DAYS = 7
+const MIN_DAYS     = 1
+const MAX_DAYS     = 365
 
 interface CachedFeed {
   fetchedAt: number
+  days:      number
   items:     RawItem[]
   errors:    Record<string, string>
 }
 
-let cache: CachedFeed | null = null
-let inflight: Promise<CachedFeed> | null = null
+const cache = new Map<number, CachedFeed>()
+const inflight = new Map<number, Promise<CachedFeed>>()
 
-const SOURCES = [
-  { name: 'hackers',    fn: fetchHackers },
-  { name: 'committers', fn: fetchCommitters },
-  { name: 'git',        fn: fetchGit },
-  { name: 'github',     fn: fetchGitHub },
-  { name: 'planet',     fn: fetchPlanet },
-  { name: 'commitfest', fn: fetchCommitFest },
-] as const
+function clampDays(raw: string | null): number {
+  const n = Number(raw ?? DEFAULT_DAYS)
+  if (!Number.isFinite(n)) return DEFAULT_DAYS
+  return Math.max(MIN_DAYS, Math.min(MAX_DAYS, Math.round(n)))
+}
 
-async function buildFeed(): Promise<CachedFeed> {
-  const results = await Promise.allSettled(SOURCES.map(s => s.fn()))
+async function buildFeed(days: number): Promise<CachedFeed> {
+  const sources = [
+    { name: 'hackers',    fn: () => fetchHackers(days) },
+    { name: 'committers', fn: () => fetchCommitters(days) },
+    { name: 'git',        fn: () => fetchGit() },
+    { name: 'github',     fn: () => fetchGitHub() },
+    { name: 'planet',     fn: () => fetchPlanet() },
+    { name: 'commitfest', fn: () => fetchCommitFest() },
+  ] as const
+
+  const results = await Promise.allSettled(sources.map(s => s.fn()))
 
   const errors: Record<string, string> = {}
   const items: RawItem[] = []
 
   results.forEach((r, i) => {
-    const sourceName = SOURCES[i].name
+    const sourceName = sources[i].name
     if (r.status === 'fulfilled') {
       items.push(...r.value)
     } else {
       errors[sourceName] = r.reason instanceof Error ? r.reason.message : String(r.reason)
-      console.error(`[feed] source ${sourceName} failed:`, r.reason)
+      console.error(`[feed] source ${sourceName} (days=${days}) failed:`, r.reason)
     }
   })
 
-  items.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+  // Filter by the requested time window — sources that return latest-N
+  // (git, github, commitfest, planet) get clipped here for short windows,
+  // and naturally span longer windows on their own.
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+  const inWindow = items.filter(i => {
+    const t = new Date(i.publishedAt).getTime()
+    return Number.isFinite(t) && t >= cutoff
+  })
+
+  inWindow.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+
+  // Scale total cap with window: 60 for 1d, 120 for 7d, up to 400 for a year.
+  const cap = Math.min(400, Math.max(60, Math.round(60 + days * 8)))
 
   return {
     fetchedAt: Date.now(),
-    items:     items.slice(0, 120),
+    days,
+    items:     inWindow.slice(0, cap),
     errors,
   }
 }
 
 export async function GET(req: Request) {
-  const force = new URL(req.url).searchParams.get('force') === '1'
+  const url   = new URL(req.url)
+  const days  = clampDays(url.searchParams.get('days'))
+  const force = url.searchParams.get('force') === '1'
 
-  if (!force && cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
+  const cached = cache.get(days)
+  if (!force && cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
     return NextResponse.json({
-      items:     cache.items,
-      errors:    cache.errors,
-      cachedAt:  new Date(cache.fetchedAt).toISOString(),
-      stale:     false,
+      items:    cached.items,
+      errors:   cached.errors,
+      cachedAt: new Date(cached.fetchedAt).toISOString(),
+      days:     cached.days,
+      stale:    false,
     })
   }
 
-  // Coalesce concurrent rebuilds
-  if (!inflight) {
-    inflight = buildFeed().finally(() => { inflight = null })
+  let pending = inflight.get(days)
+  if (!pending) {
+    pending = buildFeed(days).finally(() => { inflight.delete(days) })
+    inflight.set(days, pending)
   }
 
   try {
-    const fresh = await inflight
-    cache = fresh
+    const fresh = await pending
+    cache.set(days, fresh)
     return NextResponse.json({
       items:    fresh.items,
       errors:   fresh.errors,
       cachedAt: new Date(fresh.fetchedAt).toISOString(),
+      days:     fresh.days,
       stale:    false,
     })
   } catch (err) {
-    // If rebuild fails entirely, fall back to stale cache if any
-    if (cache) {
+    if (cached) {
       return NextResponse.json({
-        items:    cache.items,
-        errors:   { ...cache.errors, _fetch: String(err) },
-        cachedAt: new Date(cache.fetchedAt).toISOString(),
+        items:    cached.items,
+        errors:   { ...cached.errors, _fetch: String(err) },
+        cachedAt: new Date(cached.fetchedAt).toISOString(),
+        days:     cached.days,
         stale:    true,
       })
     }
-    return NextResponse.json({ items: [], errors: { _fetch: String(err) }, stale: false }, { status: 500 })
+    return NextResponse.json(
+      { items: [], errors: { _fetch: String(err) }, days, stale: false },
+      { status: 500 }
+    )
   }
 }

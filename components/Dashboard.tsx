@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { RawItem } from '@/types'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { RawItem, InternalsTag } from '@/types'
+import { detectTopics } from '@/lib/detectTopics'
 import { FeedColumn } from './FeedColumn'
 import { SourceFilter, SourceKey } from './SourceFilter'
+import { TopicFilter } from './TopicFilter'
 import { DigestBanner } from './DigestBanner'
 import { PatchTracker } from './PatchTracker'
+import { RangeSelector } from './RangeSelector'
 
 type Phase = 'idle' | 'fetching' | 'done'
 type View  = 'feed' | 'patches'
@@ -111,19 +114,22 @@ export function Dashboard() {
   const [errors, setErrors]     = useState<Record<string, string>>({})
   const [cachedAt, setCachedAt] = useState<string | null>(null)
   const [phase, setPhase]       = useState<Phase>('idle')
-  const [active, setActive]     = useState<Set<SourceKey>>(new Set())
-  const [view, setView]         = useState<View>('feed')
+  const [active, setActive]           = useState<Set<SourceKey>>(new Set())
+  const [activeTopics, setActiveTopics] = useState<Set<InternalsTag>>(new Set())
+  const [view, setView]               = useState<View>('feed')
+  const [days, setDays]               = useState<number>(7)
   const abortRef                = useRef<AbortController | null>(null)
 
-  const loadFeed = useCallback(async (force = false) => {
+  const loadFeed = useCallback(async (force = false, daysParam = days) => {
     abortRef.current?.abort()
     abortRef.current = new AbortController()
     const { signal } = abortRef.current
 
     try {
       setPhase('fetching')
-      const url = force ? '/api/feed?force=1' : '/api/feed'
-      const res = await fetch(url, { signal })
+      const params = new URLSearchParams({ days: String(daysParam) })
+      if (force) params.set('force', '1')
+      const res = await fetch(`/api/feed?${params}`, { signal })
       const data: FeedResponse = await res.json()
       setItems(data.items ?? [])
       setErrors(data.errors ?? {})
@@ -135,16 +141,41 @@ export function Dashboard() {
         setPhase('done')
       }
     }
-  }, [])
+  }, [days])
 
   useEffect(() => {
-    loadFeed()
-    return () => abortRef.current?.abort()
-  }, [loadFeed])
+    // Debounce when days changes via the number input
+    const handle = setTimeout(() => loadFeed(false, days), 250)
+    return () => {
+      clearTimeout(handle)
+      abortRef.current?.abort()
+    }
+  }, [loadFeed, days])
 
-  const filtered = active.size === 0
+  // Stage 1: source filter
+  const sourceFiltered = active.size === 0
     ? items
     : items.filter(i => active.has(i.source))
+
+  // Precompute topic membership once per sourceFiltered change
+  const topicMap = useMemo(() =>
+    new Map(sourceFiltered.map(i => [i.id, detectTopics(i)])),
+    [sourceFiltered]
+  )
+
+  // Stage 2: topic filter (OR logic across active topics)
+  const filtered = activeTopics.size === 0
+    ? sourceFiltered
+    : sourceFiltered.filter(i => (topicMap.get(i.id) ?? []).some(t => activeTopics.has(t)))
+
+  // Topic counts based on sourceFiltered (so counts stay stable as topics are toggled)
+  const topicCounts = useMemo(() => {
+    const counts: Partial<Record<InternalsTag, number>> = {}
+    for (const [, tags] of topicMap) {
+      for (const t of tags) counts[t] = (counts[t] ?? 0) + 1
+    }
+    return counts
+  }, [topicMap])
 
   const mailingItems = filtered.filter(i => ['hackers', 'committers'].includes(i.source))
   const commitItems  = filtered.filter(i => ['git', 'github', 'commitfest', 'planet'].includes(i.source))
@@ -159,6 +190,7 @@ export function Dashboard() {
         onView={setView}
         onRefresh={() => loadFeed(true)}
       />
+      <RangeSelector value={days} onChange={setDays} />
       <DigestBanner items={items} />
       <SourceFilter
         active={active}
@@ -172,6 +204,19 @@ export function Dashboard() {
           })
         }}
         onClear={() => setActive(new Set())}
+      />
+      <TopicFilter
+        active={activeTopics}
+        counts={topicCounts}
+        onToggle={(tag) => {
+          setActiveTopics(prev => {
+            const next = new Set(prev)
+            if (next.has(tag)) next.delete(tag)
+            else next.add(tag)
+            return next
+          })
+        }}
+        onClear={() => setActiveTopics(new Set())}
       />
       {view === 'feed' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-pg-blue/10">
