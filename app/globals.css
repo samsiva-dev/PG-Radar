@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+/* Force `dark:` variants to always apply (app-wide dark theme) */
+@custom-variant dark (&);
+
+/* PostgreSQL brand palette */
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* PG blue — official #336791 */
+  --color-pg-blue:   #336791;
+  /* Lighter sky for dark-mode text */
+  --color-pg-sky:    #69b1f0;
+  /* Deep navy for dark backgrounds */
+  --color-pg-ink:    #0e1724;
+  /* Off-white page background */
+  --color-pg-paper:  #f5f7fa;
+
+  /* Source-dot accent colors */
+  --color-pg-purple: #7c5cbf;
+  --color-pg-teal:   #2a8a7f;
+  --color-pg-amber:  #c47d24;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-pg-ink);
+  color: #e2e8f0;
+  font-family: var(--font-sans, Arial, Helvetica, sans-serif);
+}
