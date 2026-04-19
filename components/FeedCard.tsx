@@ -12,19 +12,6 @@ const SOURCE_DOT: Record<string, string> = {
   planet:     'bg-gray-400',
 }
 
-function formatRelativeDate(iso: string): string {
-  try {
-    const diff = Date.now() - new Date(iso).getTime()
-    const mins  = Math.floor(diff / 60000)
-    const hours = Math.floor(diff / 3600000)
-    const days  = Math.floor(diff / 86400000)
-    if (mins < 60)  return `${mins}m ago`
-    if (hours < 24) return `${hours}h ago`
-    return `${days}d ago`
-  } catch {
-    return iso
-  }
-}
 
 function extractMessageId(url: string): string {
   const tail = url.split('/message-id/').pop()?.replace(/^flat\//, '') ?? ''
@@ -125,7 +112,7 @@ export function FeedCard({ item }: { item: RawItem }) {
 
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-gray-400">
-          {item.author} · {formatRelativeDate(item.publishedAt)}
+          {item.author}
         </span>
         <div className="flex items-center gap-1.5">
           {ai && (
