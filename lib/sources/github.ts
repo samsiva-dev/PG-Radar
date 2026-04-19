@@ -20,7 +20,7 @@ export async function fetchGitHub(): Promise<RawItem[]> {
   }
 
   const res = await fetch(
-    'https://api.github.com/repos/postgres/postgres/commits?per_page=20',
+    'https://api.github.com/repos/postgres/postgres/commits?per_page=30',
     { headers, next: { revalidate: 300 } }
   )
 

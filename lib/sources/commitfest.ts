@@ -13,7 +13,7 @@ export async function fetchCommitFest(): Promise<RawItem[]> {
     unique.push(e)
   }
 
-  return unique.slice(0, 10).map(e => ({
+  return unique.slice(0, 20).map(e => ({
     id:          makeItemId('commitfest', e.guid || e.link),
     source:      'commitfest' as const,
     title:       `[CommitFest] ${stripPatchPrefix(e.title)}`,

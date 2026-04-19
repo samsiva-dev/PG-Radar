@@ -10,7 +10,7 @@ import { RawItem }          from '@/types'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const CACHE_TTL_MS = 5 * 60 * 1000  // 5 minutes
+const CACHE_TTL_MS = 10 * 60 * 1000  // 10 minutes
 
 interface CachedFeed {
   fetchedAt: number
@@ -50,7 +50,7 @@ async function buildFeed(): Promise<CachedFeed> {
 
   return {
     fetchedAt: Date.now(),
-    items:     items.slice(0, 60),
+    items:     items.slice(0, 120),
     errors,
   }
 }

@@ -6,7 +6,7 @@ export async function fetchGit(): Promise<RawItem[]> {
     'https://git.postgresql.org/gitweb/?p=postgresql.git;a=rss'
   )
 
-  return entries.slice(0, 15).map(e => ({
+  return entries.slice(0, 30).map(e => ({
     id:          makeItemId('git', e.guid),
     source:      'git' as const,
     title:       e.title.replace(/^[a-f0-9]+ /, ''), // strip hash prefix

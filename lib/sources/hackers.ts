@@ -12,7 +12,7 @@ function getSinceDateCompact(daysBack: number): string {
 }
 
 export async function fetchHackers(): Promise<RawItem[]> {
-  return scrapeMailingList('hackers', 'pgsql-hackers', 3)
+  return scrapeMailingList('hackers', 'pgsql-hackers', 7)
 }
 
 export async function scrapeMailingList(
