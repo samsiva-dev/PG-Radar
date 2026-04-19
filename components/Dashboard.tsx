@@ -29,53 +29,70 @@ interface HeaderProps {
 function Header({ phase, cachedAt, errors, view, onView, onRefresh }: HeaderProps) {
   const errorSources = Object.keys(errors)
   return (
-    <header className="flex items-center justify-between px-4 py-3 border-b border-pg-blue/10 bg-white dark:bg-pg-ink">
-      <div className="flex items-center gap-3">
-        <span className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-pg-blue dark:text-pg-sky">
-          <span aria-hidden className="inline-block w-2.5 h-2.5 rounded-full bg-pg-blue dark:bg-pg-sky" />
-          pg radar
-        </span>
-        <span className="text-xs px-2 py-0.5 rounded-full bg-pg-blue/10 text-pg-blue dark:bg-pg-sky/15 dark:text-pg-sky">
-          PG18 watch
-        </span>
-        <div className="ml-2 flex rounded-md overflow-hidden border border-pg-blue/20 dark:border-pg-sky/20 text-xs">
+    <header className="border-b border-pg-blue/10 bg-white dark:bg-pg-ink">
+      {/* Row 1: brand + status + refresh */}
+      <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-pg-blue dark:text-pg-sky">
+            <span aria-hidden className="inline-block w-2.5 h-2.5 rounded-full bg-pg-blue dark:bg-pg-sky" />
+            pg radar
+          </span>
+          <span className="hidden sm:inline-block text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-pg-blue/10 text-pg-blue dark:bg-pg-sky/15 dark:text-pg-sky whitespace-nowrap">
+            PG18 watch
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 min-w-0">
+          {phase === 'fetching' && (
+            <span className="animate-pulse text-pg-blue dark:text-pg-sky truncate">
+              <span className="hidden sm:inline">fetching sources…</span>
+              <span className="sm:hidden">fetching…</span>
+            </span>
+          )}
+          {phase === 'done' && cachedAt && (
+            <span
+              className="hidden sm:inline truncate"
+              title={`Cached at ${new Date(cachedAt).toLocaleString()}`}
+            >
+              live · cached {formatRelativeShort(cachedAt)}
+            </span>
+          )}
+          {errorSources.length > 0 && (
+            <span
+              className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300 whitespace-nowrap"
+              title={Object.entries(errors).map(([s, e]) => `${s}: ${e}`).join('\n')}
+            >
+              <span className="hidden sm:inline">{errorSources.length} source{errorSources.length > 1 ? 's' : ''} failed</span>
+              <span className="sm:hidden">⚠ {errorSources.length}</span>
+            </span>
+          )}
+          <button
+            onClick={onRefresh}
+            aria-label="Refresh feed"
+            className="text-xs border border-pg-blue/30 dark:border-pg-sky/30 text-pg-blue dark:text-pg-sky rounded px-2 py-1 hover:bg-pg-blue/5 dark:hover:bg-pg-sky/10 transition-colors whitespace-nowrap"
+          >
+            <span className="hidden sm:inline">refresh</span>
+            <span className="sm:hidden" aria-hidden>↻</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Row 2: view toggle — full-width segmented control on mobile */}
+      <div className="px-3 sm:px-4 pb-2 sm:pb-2.5 sm:-mt-1">
+        <div className="flex w-full sm:w-auto sm:inline-flex rounded-md overflow-hidden border border-pg-blue/20 dark:border-pg-sky/20 text-xs">
           <button
             onClick={() => onView('feed')}
-            className={`px-2 py-0.5 transition-colors ${view === 'feed' ? 'bg-pg-blue text-white dark:bg-pg-sky dark:text-pg-ink' : 'text-pg-blue dark:text-pg-sky hover:bg-pg-blue/10'}`}
+            className={`flex-1 sm:flex-none px-3 py-1 transition-colors ${view === 'feed' ? 'bg-pg-blue text-white dark:bg-pg-sky dark:text-pg-ink' : 'text-pg-blue dark:text-pg-sky hover:bg-pg-blue/10'}`}
           >
             feed
           </button>
           <button
             onClick={() => onView('patches')}
-            className={`px-2 py-0.5 transition-colors ${view === 'patches' ? 'bg-pg-blue text-white dark:bg-pg-sky dark:text-pg-ink' : 'text-pg-blue dark:text-pg-sky hover:bg-pg-blue/10'}`}
+            className={`flex-1 sm:flex-none px-3 py-1 transition-colors ${view === 'patches' ? 'bg-pg-blue text-white dark:bg-pg-sky dark:text-pg-ink' : 'text-pg-blue dark:text-pg-sky hover:bg-pg-blue/10'}`}
           >
             patches
           </button>
         </div>
-      </div>
-      <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-        {phase === 'fetching' && (
-          <span className="animate-pulse text-pg-blue dark:text-pg-sky">fetching sources…</span>
-        )}
-        {phase === 'done' && cachedAt && (
-          <span title={`Cached at ${new Date(cachedAt).toLocaleString()}`}>
-            live · cached {formatRelativeShort(cachedAt)}
-          </span>
-        )}
-        {errorSources.length > 0 && (
-          <span
-            className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"
-            title={Object.entries(errors).map(([s, e]) => `${s}: ${e}`).join('\n')}
-          >
-            {errorSources.length} source{errorSources.length > 1 ? 's' : ''} failed
-          </span>
-        )}
-        <button
-          onClick={onRefresh}
-          className="text-xs border border-pg-blue/30 dark:border-pg-sky/30 text-pg-blue dark:text-pg-sky rounded px-2 py-1 hover:bg-pg-blue/5 dark:hover:bg-pg-sky/10 transition-colors"
-        >
-          refresh
-        </button>
       </div>
     </header>
   )

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "PG Radar — PostgreSQL Internals Dashboard",
-  description: "Real-time PostgreSQL community feed enriched with Claude",
+  description: "Real-time PostgreSQL community feed",
 };
 
 export default function RootLayout({

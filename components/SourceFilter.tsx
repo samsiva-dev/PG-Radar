@@ -22,7 +22,7 @@ interface SourceFilterProps {
 
 export function SourceFilter({ active, counts, onToggle, onClear }: SourceFilterProps) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b border-pg-blue/10 bg-white dark:bg-pg-ink">
+    <div className="flex items-center gap-1.5 px-3 sm:px-4 py-2 border-b border-pg-blue/10 bg-white dark:bg-pg-ink overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
       {active.size > 0 && (
         <button
           onClick={onClear}
