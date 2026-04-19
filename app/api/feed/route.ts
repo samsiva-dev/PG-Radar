@@ -59,7 +59,12 @@ async function buildFeed(days: number): Promise<CachedFeed> {
   // Filter by the requested time window — sources that return latest-N
   // (git, github, commitfest, planet) get clipped here for short windows,
   // and naturally span longer windows on their own.
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+  // Align to midnight (same as getSinceDateCompact) so mailing-list items
+  // stamped at 00:00 of the since-date are never clipped by a sub-day gap.
+  const cutoffDate = new Date()
+  cutoffDate.setUTCDate(cutoffDate.getUTCDate() - days)
+  cutoffDate.setUTCHours(0, 0, 0, 0)
+  const cutoff = cutoffDate.getTime()
   const inWindow = items.filter(i => {
     const t = new Date(i.publishedAt).getTime()
     return Number.isFinite(t) && t >= cutoff

@@ -67,13 +67,33 @@ export async function scrapeMailingList(
 }
 
 function parsePageDate(sinceCompact: string, timeStr: string): string {
-  // sinceCompact = "202604160000", timeStr = "08:42"
+  if (!timeStr) return new Date().toISOString()
   try {
+    // Try direct parse first — covers "19 Apr 2026 14:23:17 +0000",
+    // "2026-04-19 14:23", "Apr 15, 2026", etc.
+    const direct = new Date(timeStr)
+    if (!isNaN(direct.getTime()) && direct.getFullYear() > 2000) {
+      return direct.toISOString()
+    }
+
+    // If it's a bare HH:MM shown for today's messages, use today's date
+    const timeOnly = timeStr.match(/^(\d{1,2}):(\d{2})$/)
+    if (timeOnly) {
+      const now = new Date()
+      return new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(),
+          Number(timeOnly[1]), Number(timeOnly[2]))
+      ).toISOString()
+    }
+
+    // Last resort: combine sinceCompact date with any HH:MM found in timeStr
     const year  = sinceCompact.slice(0, 4)
     const month = sinceCompact.slice(4, 6)
     const day   = sinceCompact.slice(6, 8)
-    const [h, mi] = timeStr.split(':')
-    const d = new Date(`${year}-${month}-${day}T${h.padStart(2,'0')}:${(mi ?? '00').padStart(2,'0')}:00Z`)
+    const hm    = timeStr.match(/(\d{1,2}):(\d{2})/)
+    const h  = hm ? hm[1].padStart(2, '0') : '00'
+    const mi = hm ? hm[2].padStart(2, '0') : '00'
+    const d = new Date(`${year}-${month}-${day}T${h}:${mi}:00Z`)
     return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString()
   } catch {
     return new Date().toISOString()
