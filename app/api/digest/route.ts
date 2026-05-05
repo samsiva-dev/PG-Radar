@@ -55,7 +55,14 @@ export async function POST(req: Request) {
 
   const top = items.slice(0, 30)
   const lines = top
-    .map((i, idx) => `${idx + 1}. [${i.source}] ${i.title}${i.snippet ? ` — ${i.snippet.slice(0, 200)}` : ''}`)
+    .map((i, idx) => {
+      const sourceLabel: Record<string, string> = {
+        hackers: 'hackers', committers: 'committers',
+        git: 'git commit', github: 'github', commitfest: 'commitfest', planet: 'blog',
+      }
+      const body = i.snippet ? ` — ${i.snippet.slice(0, 300)}` : ''
+      return `${idx + 1}. [${sourceLabel[i.source] ?? i.source}] ${i.title} (${i.author})${body}`
+    })
     .join('\n')
 
   try {
@@ -66,17 +73,19 @@ export async function POST(req: Request) {
       messages: [
         {
           role: 'system',
-          content: `You are an editor producing a short daily digest of PostgreSQL community activity for an internals-focused engineer.
+          content: `You are a PostgreSQL internals expert writing a daily digest for senior database engineers.
+
+Note: mailing list items may only have a title and author — infer technical context from the subject line.
 
 Respond with ONLY a JSON object:
 {
-  "digest": string,        // 3–5 sentence overview paragraph; mention concrete subsystems & names
-  "highlights": string[]   // 3–5 most important items, each as a single short sentence
+  "digest": string,        // 3–5 sentences synthesizing today's themes — identify the 2-3 dominant areas of activity (e.g. planner work, WAL changes, VACUUM improvements), name specific authors and patches, and call out the single most technically significant change and why it matters for PostgreSQL internals
+  "highlights": string[]   // exactly 4–5 bullet points, each one sentence; lead with the subsystem name in brackets, e.g. "[planner] Tom Lane's patch reduces..."; pick the items with highest technical impact
 }`,
         },
         {
           role: 'user',
-          content: `Items from the last 24h:\n\n${lines}\n\nProduce the JSON.`,
+          content: `PostgreSQL community activity (most recent first):\n\n${lines}\n\nProduce the JSON digest.`,
         },
       ],
     })
